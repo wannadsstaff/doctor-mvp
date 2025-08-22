@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DoctorIA — Chat</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#22d3ee; }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,Segoe UI,Roboto}
+    .wrap{max-width:780px;margin:0 auto;padding:24px}
+    .card{background:var(--panel);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);overflow:hidden}
+    header{padding:16px 20px;border-bottom:1px solid #1f2937;display:flex;align-items:center;gap:12px}
+    header .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent)}
+    header h1{margin:0;font-size:16px}
+    .chat{padding:18px;height:min(70vh,620px);overflow:auto;display:flex;flex-direction:column;gap:12px}
+    .msg{max-width:85%;padding:12px 14px;border-radius:14px;white-space:pre-wrap;word-wrap:break-word}
+    .user{align-self:flex-end;background:#1d4ed8;border-bottom-right-radius:4px}
+    .bot{align-self:flex-start;background:#0b132b;border-bottom-left-radius:4px;border:1px solid #1f2937}
+    .muted{color:var(--muted);font-size:13px}
+    form{display:flex;gap:10px;padding:12px;border-top:1px solid #1f2937;background:rgba(0,0,0,.35)}
+    input[type=text]{flex:1;border:1px solid #334155;background:#0b1220;color:var(--text);padding:12px 14px;border-radius:12px;outline:none}
+    button{background:var(--accent);color:#00121a;border:0;padding:0 18px;border-radius:12px;font-weight:600;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:wait}
+    .hint{padding:10px 16px;border-top:1px dashed #233047;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div class="dot"></div>
+        <h1>DoctorIA — orientación general</h1>
+      </header>
+
+      <div id="chat" class="chat">
+        <div class="msg bot">Hola 👋 Soy DoctorIA. Puedo darte orientación general de salud (no sustituye a un profesional). ¿En qué te ayudo?</div>
+      </div>
+
+      <form id="form">
+        <input id="prompt" type="text" placeholder="Escribe tu consulta…" autocomplete="off" />
+        <button id="send" type="submit">Enviar</button>
+      </form>
+
+      <div class="hint">⚠️ No es diagnóstico. En urgencias, llama al <b>112</b> (España).</div>
+    </div>
+  </div>
+
+  <script>
+    const chat   = document.getElementById("chat");
+    const form   = document.getElementById("form");
+    const input  = document.getElementById("prompt");
+    const sendBt = document.getElementById("send");
+
+    // Añade un "globo" al chat
+    function bubble(text, who="bot") {
+      const div = document.createElement("div");
+      div.className = `msg ${who}`;
+      div.textContent = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function ask(prompt){
+      // 1) pinta el mensaje del usuario
+      bubble(prompt, "user");
+
+      // 2) desactiva UI mientras pide al backend
+      input.value = "";
+      input.disabled = true;
+      sendBt.disabled = true;
+
+      try {
+        // ⚠️ Endpoint de tu backend. Usamos ruta relativa para que funcione en Render.
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt })
+        });
+
+        if (!res.ok) throw new Error("Error " + res.status);
+        const data = await res.json();
+
+        // Tu backend devuelve { reply: "texto..." }
+        bubble(data.reply || "No he podido generar respuesta ahora.", "bot");
+      } catch (err) {
+        console.error(err);
+        bubble("Lo siento, hubo un problema. Inténtalo de nuevo en un momento.", "bot");
+      } finally {
+        input.disabled = false;
+        sendBt.disabled = false;
+        input.focus();
+      }
+    }
+
+    // Enviar con Enter o botón
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const v = input.value.trim();
+      if (!v) return;
+      ask(v);
+    });
+
+    // Atajo: Ctrl/Cmd + Enter
+    input.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
+  </script>
+</body>
+</html>

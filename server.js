@@ -1,53 +1,59 @@
+// server.js
+// 1) Dependencias
 import express from "express";
+import cors from "cors";
 import dotenv from "dotenv";
 import OpenAI from "openai";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
-
-// Middleware para procesar JSON
+app.use(cors());
 app.use(express.json());
 
-// Inicializar cliente de OpenAI
+// Necesario para obtener __dirname con ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 2) Configuración OpenAI
 const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // la clave se toma de .env
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Ruta de prueba
-app.get("/", (req, res) => {
-  res.send("Servidor funcionando 🚀 Usa POST /chat para enviar un prompt.");
-});
-
-// Ruta para chat
+// 3) Endpoint del chat
 app.post("/chat", async (req, res) => {
   try {
     const { prompt } = req.body;
 
-    if (!prompt) {
-      return res.status(400).json({ error: "Falta el campo 'prompt' en el body." });
-    }
-
     const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o-mini", // rápido y barato
       messages: [
-        { role: "system", content: "Eres un asistente médico que responde de forma clara y responsable." },
+        { role: "system", content: "Eres DoctorIA, un asistente de orientación general en salud. No das diagnósticos médicos." },
         { role: "user", content: prompt },
       ],
+      max_tokens: 300,
     });
 
-    res.json({
-      reply: response.choices[0].message.content,
-    });
+    const reply = response.choices[0].message.content;
+    res.json({ reply });
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ reply: "Error en el servidor. Inténtalo más tarde." });
   }
 });
 
-// Iniciar servidor
-app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
+// 4) Servir archivos estáticos (index.html, style.css, script.js)
+app.use(express.static(path.join(__dirname, "public")));
+
+// Ruta raíz → index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// 5) Arrancar servidor
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`✅ Servidor corriendo en http://localhost:${PORT}`);
+});
